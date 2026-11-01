@@ -122,6 +122,35 @@ header span{color:var(--soft);font-size:.9rem;white-space:nowrap}
 .chip small{color:var(--jade);font-size:.75rem}
 .chip.used{visibility:hidden}
 .answer{font-family:var(--hz);font-size:1.15rem;margin:0 0 4px;text-align:center}
+.chapbtn{display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;margin:22px 0 8px;padding:34px 16px;border:2px solid var(--jade);border-radius:18px;background:var(--jade-t);color:var(--ink);cursor:pointer}
+.chapbtn .ci{font-size:3.4rem;line-height:1}
+.chapbtn .cn{font-size:2.2rem;font-weight:700;letter-spacing:.02em}
+.chapbtn small{color:var(--soft);font-size:.9rem}
+.chapbtn:active{transform:scale(.98)}
+.panel.tall{display:flex;flex-direction:column;min-height:calc(100svh - 150px)}
+.panel.tall .chapbtn{flex:1;justify-content:center;margin:20px 0 4px}
+.ctx.big{margin:14px 0 0;padding:14px 16px}
+.ctx.big b.zh{font-size:1.4rem}
+.ctx .cp{display:block;color:var(--jade);font-size:.95rem;margin:2px 0}
+.ask{margin-top:auto;padding-top:36px;text-align:center}
+.askl{color:var(--soft);font-size:1rem;margin:0 0 8px}
+.askq{font-size:1.8rem;line-height:1.4;margin:0}
+.zone{margin-top:auto;padding:18px 0 6px}
+.zone .mic{width:104px;height:104px;font-size:2.6rem}
+.passrow{margin-top:8px}
+@media (max-height:720px){
+.panel.tall{min-height:calc(100svh - 120px);padding:14px 16px}
+.panel.tall .clock{font-size:1.9rem}
+.tbar{margin-top:8px}
+.ctx.big{margin-top:8px;padding:10px 12px}
+.ctx.big b.zh{font-size:1.15rem}
+.ctx.big small{font-size:.78rem}
+.ask{padding-top:16px}
+.askq{font-size:1.4rem}
+.zone{padding:8px 0 0}
+.zone .mic{width:80px;height:80px;font-size:2rem;margin:6px auto 2px}
+.micstate{font-size:.85rem}
+}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 /* sentence card */
 .scene{display:flex;align-items:center;gap:12px;margin:6px 0 14px}
@@ -441,29 +470,42 @@ function test(){
 function runTest(plan,maxRaw){
   const queue=plan.map(w=>({w}));
   const results=new Map();  // no -> {said, status:'said'|'timeout'|'self', selfScore}
-  let passes=PASSES, idx=0, rec=null, alive=true;
+  let passes=PASSES, idx=0, rec=null, alive=true, lastCh=null;
   cleanup=()=>{alive=false;clearInterval(timer);try{rec&&rec.abort()}catch(e){}};
   const total=queue.length;
   const next=()=>{
     clearInterval(timer);try{rec&&rec.abort()}catch(e){};rec=null;
     if(!alive)return;
     if(!queue.length)return finish();
-    ask(queue[0].w);
+    const w=queue[0].w;
+    if(w.ch!==lastCh)chapter(w);else ask(w);
   };
+  function chapter(w){
+    const done=results.size;
+    app.innerHTML=`<section class="panel tall">
+      <div class="bar"><i style="width:${done/total*100}%"></i></div>
+      <div class="row"><span class="count">${done+1} / ${total}</span><span class="spacer"></span><span class="count">패스 ${passes}번 남음</span></div>
+      <button class="chapbtn" id="cb"><span class="ci" aria-hidden="true">${CH[w.ch]}</span><span class="cn">${esc(w.ch)}편</span><small>누르면 문제가 시작돼요 (15초)</small></button>
+    </section>`;
+    cb.onclick=()=>{lastCh=w.ch;ask(w)};
+    cb.focus({preventScroll:true});
+  }
   function ask(w){
     const p=partnerOf(w), ctx=(SET===0&&p&&p.no<w.no)?p:null;
     const done=results.size;
     let left=LIMIT, said="", answered=false, listening=false;
-    app.innerHTML=`<section class="panel">
+    app.innerHTML=`<section class="panel tall">
       <div class="bar"><i style="width:${done/total*100}%"></i></div>
       <div class="row"><span class="count">${done+1} / ${total}</span>${chTag(w)}<span class="spacer"></span><span class="count">패스 ${passes}번 남음</span></div>
       <div class="tbar"><i id="tb"></i></div>
       <div class="row" style="margin:6px 0 4px"><span class="clock" id="tc">${LIMIT}</span><span class="count" style="margin-left:6px">초</span></div>
-      ${ctx?`<div class="ctx"><span class="who">상대</span><span><b class="zh">${esc(ctx.hz)}</b><small>${esc(ctx.kr)}</small></span></div>`:""}
-      <p class="lead" style="margin:10px 0 2px">이 문장을 중국어로 말하세요</p>
-      <div class="q-kr" style="margin-top:4px">${esc(w.kr)}</div>
-      <div id="zone"></div>
-      <div class="row" style="margin-top:14px"><button class="btn" id="ps" ${passes<=0?"disabled":""}>패스 (맨 뒤로)</button></div>
+      ${ctx?`<div class="ctx big"><span class="who">상대</span><span><b class="zh">${esc(ctx.hz)}</b><span class="cp">${esc(ctx.py)}</span><small>${esc(ctx.kr)}</small></span></div>`:""}
+      <div class="ask">
+        <p class="askl">이 문장을 중국어로 말하세요</p>
+        <div class="q-kr askq">${esc(w.kr)}</div>
+      </div>
+      <div id="zone" class="zone"></div>
+      <div class="row passrow"><button class="btn" id="ps" ${passes<=0?"disabled":""}>패스 (맨 뒤로)</button></div>
     </section>`;
     const zone=document.getElementById("zone");
     const tick=()=>{left--;tc.textContent=Math.max(left,0);tb.style.width=(left/LIMIT*100)+"%";if(left<=5)tc.classList.add("low");if(left<=0)timeout()};
@@ -538,7 +580,9 @@ function runTest(plan,maxRaw){
 주의:
 - 음성 인식 결과라 소리가 같거나 비슷한 다른 한자(동음이의어)가 나올 수 있어. 소리가 같거나 성조만 조금 다른 글자는 맞게 말한 것으로 봐. 발음은 후하게 채점해.
 - 문장부호, 띄어쓰기, 儿화 유무, 您/你 차이 정도는 감점하지 마.
+- 성조를 뺀 병음이 같으면 한자가 달라도 정확하게 말한 거야. (예: 师傅→师父, 预订→预定, 一点儿→一点, 一杯→1杯 모두 감점 없음)
 - 주로 빠진 단어, 다른 단어로 바꿔 말한 것, 틀린 어순을 보고 채점해.
+- 정답에 없는 단어를 더 말한 것도 오류야. 특히 不/没/别 같은 부정어가 더해져 뜻이 반대가 되거나 뜻이 달라지면 0점이야. (예: 정답 我有预订。 학생 我没有预订。 → 0점)
 - feedback은 한국어 1~2문장. 학생에게 친근하게. 감점이 있으면 무엇이 빠졌는지/어순이 어떻게 틀렸는지 중국어 단어와 병음을 넣어 구체적으로. 2점이면 짧게 칭찬.
 채점할 문장들(JSON):
 ${JSON.stringify(items)}
@@ -548,7 +592,7 @@ ${JSON.stringify(items)}
         }
       }catch(e){graded={};by="local"}
     }
-    toGrade.forEach((x,i)=>{const g=graded[i]||localGrade(x.w,x.said);x.score=g.score;x.feedback=g.feedback;if(!graded[i])x.local=true});
+    toGrade.forEach((x,i)=>{const lg=localGrade(x.w,x.said);const g=(lg.score===2||lg.neg||!graded[i])?lg:graded[i];x.score=g.score;x.feedback=g.feedback;if(!graded[i])x.local=true});
     for(const x of list){
       if(x.status==="timeout"){x.score=0;x.feedback=x.said?"15초 안에 끝내지 못해서 0점이에요.":"⏰ 시간 초과로 0점이에요. 이 문장을 먼저 연습해 보세요."}
       if(x.status==="self"){x.score=x.selfScore;x.feedback="스스로 채점한 점수예요."}
@@ -601,24 +645,35 @@ function findWord(said,syl,from){
 function localGrade(w,saidText){
   const said=toSyl(saidText);
   if(!said.length)return{score:0,feedback:"말한 내용이 인식되지 않았어요."};
-  const soft=new Set(["吗","了","的"]);
-  const missing=[];let pos=-1,inOrder=true;
+  const NEG=new Set(["不","没","別","别","未"]);
+  const missing=[],covered=new Set();let pos=-1,inOrder=true;
   for(const [h,py,,syl] of w.words){
     let p=findWord(said,syl,pos+1);
     if(p<0){const q=findWord(said,syl,0);if(q<0){missing.push([h,py]);continue}inOrder=false;p=q}
+    for(let k=0;k<syl.length;k++)covered.add(p+k);
     pos=Math.max(pos,p+syl.length-1);
   }
-  const hard=missing.filter(([h])=>!soft.has(h));
-  const total=w.words.length, extra=said.length-w.words.reduce((a,x)=>a+x[3].length,0);
+  const extra=said.filter((x,i)=>!covered.has(i)).map(x=>x.c);
+  const answerHasNeg=[...w.hz].some(c=>NEG.has(c));
+  const negAdded=!answerHasNeg&&extra.some(c=>NEG.has(c));
+  const answerLen=w.words.reduce((a,x)=>a+x[3].length,0);
   const list=missing.map(([h,py])=>`${h}(${py})`).join(", ");
-  if(!missing.length&&inOrder)return{score:2,feedback:"발음과 어순이 정확해요! 잘했어요."};
-  if(hard.length<=Math.max(1,Math.floor(total/3))&&(inOrder||!hard.length)){
+  const extraTxt=extra.join("");
+  if(negAdded)return{score:0,neg:true,feedback:`정답에 없는 부정어(${extra.filter(c=>NEG.has(c)).join("")})가 들어가서 뜻이 반대가 됐어요. 정답: ${w.hz}`};
+  if(!missing.length&&inOrder&&!extra.length)return{score:2,feedback:"발음과 어순이 정확해요! 잘했어요."};
+  const errs=missing.length+(inOrder?0:1)+(extra.length?1:0);
+  if(missing.length<=Math.max(1,Math.floor(w.words.length/3))&&extra.length<=Math.max(3,answerLen)&&errs<=2){
     const parts=[];
     if(missing.length)parts.push(`빠지거나 다르게 들린 단어: ${list}`);
+    if(extra.length)parts.push(`정답에 없는 말이 더 들어갔어요: ${extraTxt}`);
     if(!inOrder)parts.push("단어 순서가 정답과 달라요. 정답 어순을 다시 확인해 보세요");
     return{score:1,feedback:parts.join(". ")+"."};
   }
-  return{score:0,feedback:missing.length?`빠지거나 다르게 들린 단어가 많아요: ${list}.`:"단어 순서가 많이 달라서 뜻 전달이 어려워요."};
+  const parts=[];
+  if(missing.length)parts.push(`빠지거나 다르게 들린 단어: ${list}`);
+  if(extra.length)parts.push(`정답에 없는 말: ${extraTxt}`);
+  if(!inOrder)parts.push("어순도 정답과 달라요");
+  return{score:0,feedback:"정답과 많이 달라서 뜻 전달이 어려워요. "+parts.join(". ")+"."};
 }
 
 function showBest(){const b=store("tv-best-"+SET);document.getElementById("best").textContent=b?`최고 ${b}점`:""}
